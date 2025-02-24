@@ -1,14 +1,22 @@
-import { Box, CssBaseline } from "@mui/material";
+import { Box, createTheme, CssBaseline, ThemeProvider } from "@mui/material";
 import TagInput from "./components/SelectWithTags";
+
+const theme = createTheme({
+  palette: {
+    primary: {
+      main: "#ED0231",
+    },
+  },
+});
 
 function App() {
   return (
-    <Box>
+    <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ display: "flex", width: "80%", margin: "0 auto" }}>
+      <Box sx={{ display: "flex", width: "50%", margin: "0 auto" }}>
         <TagInput />
       </Box>
-    </Box>
+    </ThemeProvider>
   );
 }
 

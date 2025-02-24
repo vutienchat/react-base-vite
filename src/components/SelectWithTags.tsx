@@ -5,7 +5,6 @@ import {
   useLayoutEffect,
   useCallback,
   useMemo,
-  forwardRef,
 } from "react";
 import {
   Chip,
@@ -15,28 +14,14 @@ import {
   TextField,
   InputAdornment,
   Checkbox,
-  Button,
   Typography,
-  ListItem,
   ListItemButton,
 } from "@mui/material";
 import { ArrowDropDown, Search } from "@mui/icons-material";
 import { FixedSizeList } from "react-window";
 import useResizeObserver from "./useResizeObserver";
 import Dropdown from "./Dropdown";
-
-const options: string[] = [
-  "apple",
-  "banana",
-  "cherry",
-  "dog",
-  "elephant",
-  "one",
-  "two",
-  "three",
-  "four",
-  "five",
-];
+// import { NAMES } from "./constants";
 
 interface TreeNode {
   id: number;
@@ -103,18 +88,16 @@ export default function SelectWithTags() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const { width } = useResizeObserver(containerRef);
   const inputRef = useRef<HTMLDivElement | null>(null);
-  const resizeTimeoutRef = useRef<number | null>(null);
 
   const updateHiddenTags = useCallback(() => {
     if (!inputRef.current) return;
-    const containerWidth = inputRef.current.offsetWidth;
+    const inputWidth = inputRef.current.offsetWidth;
     const children = Array.from(inputRef.current.children) as HTMLDivElement[];
     let totalWidth = 0;
     let visibleCount = 0;
-
     for (const child of children) {
       totalWidth += child.offsetWidth + 4;
-      if (totalWidth > containerWidth - 50) break;
+      if (totalWidth > inputWidth - 50) break;
       visibleCount++;
     }
     setHiddenCount(selectedTags.length - visibleCount);
@@ -122,19 +105,16 @@ export default function SelectWithTags() {
 
   useLayoutEffect(() => {
     updateHiddenTags();
-    const handleResize = () => {
-      if (resizeTimeoutRef.current) clearTimeout(resizeTimeoutRef.current);
-      resizeTimeoutRef.current = setTimeout(() => {
+    const observer = new ResizeObserver((entries) => {
+      if (entries[0]) {
         updateHiddenTags();
-      }, 200);
-    };
+      }
+    });
+    if (inputRef.current) {
+      observer.observe(inputRef.current);
+    }
 
-    window.addEventListener("resize", handleResize);
-    updateHiddenTags();
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      if (resizeTimeoutRef.current) clearTimeout(resizeTimeoutRef.current);
-    };
+    return () => observer.disconnect();
   }, [selectedTags, updateHiddenTags]);
 
   const handleSelect = (option: string) => {
@@ -145,7 +125,6 @@ export default function SelectWithTags() {
 
   const handleRemove = (option: string) => {
     setSelectedTags((prev) => prev.filter((tag) => tag !== option));
-    // updateHiddenTags();
   };
 
   const handleOpen = (event: MouseEvent<HTMLDivElement>) => {
@@ -181,7 +160,10 @@ export default function SelectWithTags() {
       >
         <ListItemButton
           selected={!!checkedItems[item.id]}
-          onClick={() => toggleCheck(item.id)}
+          onClick={() => {
+            toggleCheck(item.id);
+            handleSelect(item.name);
+          }}
           style={{ minWidth: 0, paddingBlock: 0 }}
           sx={{
             "&.Mui-selected": {
@@ -193,20 +175,13 @@ export default function SelectWithTags() {
           <Typography
             noWrap
             sx={{
-              color: item.depth === 0 ? "#ED0231" : "#292929",
               flexGrow: 1,
             }}
+            color={item.depth === 0 ? "primary" : "#292929"}
           >
             {item.name}
           </Typography>
         </ListItemButton>
-        {/* <Checkbox
-          checked={!!checkedItems[item.id]}
-          onChange={() => toggleCheck(item.id)}
-        />
-        <Typography>
-          {item.name}
-        </Typography> */}
       </Box>
     );
   };
@@ -219,7 +194,7 @@ export default function SelectWithTags() {
           alignItems: "center",
           border: "1px solid #ccc",
           borderRadius: 1,
-          padding: "10px",
+          padding: "6px",
           width: 1,
           cursor: "pointer",
         }}
@@ -234,19 +209,22 @@ export default function SelectWithTags() {
             overflow: "hidden",
           }}
         >
-          {selectedTags.map((tag, index) => (
-            <Chip
-              key={tag}
-              label={tag}
-              onDelete={() => handleRemove(tag)}
-              sx={{
-                display:
-                  index < selectedTags.length - hiddenCount
-                    ? "inline-flex"
-                    : "none",
-              }}
-            />
-          ))}
+          {selectedTags.slice(0, 30).map((tag, index) => {
+            return (
+              <Chip
+                key={tag}
+                label={tag}
+                onDelete={() => handleRemove(tag)}
+                sx={{
+                  ...(index >= selectedTags.length - hiddenCount && {
+                    position: "absolute",
+                    pointerEvents: "none",
+                    opacity: 0,
+                  }),
+                }}
+              />
+            );
+          })}
           {hiddenCount > 0 && (
             <Chip
               label={`+${hiddenCount}`}
@@ -279,7 +257,7 @@ export default function SelectWithTags() {
               }}
             />
           </Box>
-          {/* {options.map((option) => (
+          {/* {NAMES.map((option) => (
             <Box
               key={option}
               sx={{
