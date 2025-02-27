@@ -13,7 +13,7 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ display: "flex", width: "50%", margin: "0 auto" }}>
+      <Box sx={{ display: "flex", width: "80%", margin: "0 auto" }}>
         <TagInput />
       </Box>
     </ThemeProvider>

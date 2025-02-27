@@ -29,41 +29,32 @@ interface TreeNode {
   children?: TreeNode[];
 }
 
-const treeData: TreeNode[] = [
-  {
-    id: 1,
-    name: "Nhóm kênh bán hàng trực tiếp",
-    children: [
-      { id: 2, name: "14/ Kênh nhân viên" },
-      {
-        id: 3,
-        name: "1001527/ Kênh hộ kinh doanh",
-      },
-    ],
-  },
-  {
-    id: 4,
-    name: "Nhóm kênh khác",
-    children: [
-      { id: 5, name: "1000499/ Kênh đại lý ủy quyền doanh nghiệp" },
-      {
-        id: 6,
-        name: "6/ Kênh đại lý XNK",
-      },
-    ],
-  },
-  {
-    id: 7,
-    name: "Nhóm kênh khác 2",
-    children: [
-      { id: 8, name: "7/ Kênh đại lý XNK" },
-      {
-        id: 9,
-        name: "8/ Kênh đại lý XNK",
-      },
-    ],
-  },
-];
+function generateTreeData(count: number): TreeNode[] {
+  let id = 1;
+
+  function createNode(level: number): TreeNode {
+    const node: TreeNode = {
+      id: id++,
+      name:
+        level === 0
+          ? `Nhóm kênh bán hàng trực tiếp ${id}`
+          : `${id}/ Kênh đại lý XNK`,
+    };
+
+    if (level < 1 && id < count) {
+      const childrenCount = Math.floor(Math.random() * 10) + 1;
+      node.children = Array.from({ length: childrenCount }, () =>
+        createNode(level + 1)
+      );
+    }
+
+    return node;
+  }
+
+  return Array.from({ length: Math.min(100, count) }, () => createNode(0));
+}
+
+const treeData1: TreeNode[] = generateTreeData(10000);
 
 interface FlatNode extends TreeNode {
   depth: number;
@@ -81,13 +72,121 @@ const flattenTree = (nodes: TreeNode[], depth = 0): FlatNode[] => {
   return result;
 };
 
+const getAllChildIds = (node: TreeNode): number[] => {
+  let ids = [node.id];
+  if (node.children) {
+    node.children.forEach((child) => {
+      ids = ids.concat(getAllChildIds(child));
+    });
+  }
+  return ids;
+};
+
+const getParentIds = (
+  id: number,
+  parentMap: Record<number, number>
+): number[] => {
+  let parents: number[] = [];
+  while (parentMap[id] !== undefined) {
+    id = parentMap[id];
+    parents.push(id);
+  }
+  return parents;
+};
+
+const buildParentMap = (
+  nodes: TreeNode[],
+  parent: TreeNode | null = null,
+  map: Record<number, number> = {}
+): Record<number, number> => {
+  nodes.forEach((node) => {
+    if (parent !== null) {
+      map[node.id] = parent.id;
+    }
+    if (node.children) {
+      buildParentMap(node.children, node, map);
+    }
+  });
+  return map;
+};
+
 export default function SelectWithTags() {
+  const [hiddenCount, setHiddenCount] = useState<number>(0);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [hiddenCount, setHiddenCount] = useState<number>(0);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const { width } = useResizeObserver(containerRef);
   const inputRef = useRef<HTMLDivElement | null>(null);
+  const { width } = useResizeObserver(containerRef);
+
+  const handleRemove = (option: string) => {
+    setSelectedTags((prev) => prev.filter((tag) => tag !== option));
+  };
+
+  const handleOpen = (event: MouseEvent<HTMLDivElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+  const [selectedCounts, setSelectedCounts] = useState<
+    Record<number, { total: number; selected: number }>
+  >({});
+  const [checkedItems, setCheckedItems] = useState<Record<number, boolean>>({});
+  const flatList = useMemo(() => flattenTree(treeData1), []);
+  const parentMap = useMemo(() => buildParentMap(treeData1), []);
+
+  const updateSelectedCounts = (newChecked: Record<number, boolean>) => {
+    const counts: Record<number, { total: number; selected: number }> = {};
+    flatList.forEach((node) => {
+      if (node.children) {
+        const total = node.children.length;
+        const selected = node.children.filter(
+          (child) => newChecked[child.id]
+        ).length;
+        counts[node.id] = { total, selected };
+      }
+    });
+    setSelectedCounts(counts);
+  };
+
+  const toggleCheck = (id: number, checked: boolean) => {
+    setCheckedItems((prev) => {
+      const newChecked = { ...prev };
+      newChecked[id] = checked;
+
+      const node = flatList.find((n) => n.id === id);
+      if (node?.children) {
+        node.children.forEach((child) => {
+          newChecked[child.id] = checked;
+        });
+      }
+
+      getParentIds(id, parentMap).forEach((parentId) => {
+        const parentNode = flatList.find((n) => n.id === parentId);
+        if (parentNode?.children) {
+          newChecked[parentId] = parentNode.children.every(
+            (child) => newChecked[child.id]
+          );
+        }
+      });
+
+      updateSelectedCounts(newChecked);
+      return newChecked;
+    });
+  };
+
+  const getTagLabels = () => {
+    return Object.entries(selectedCounts)
+      .filter(([parentId, { selected, total }]) => selected > 0)
+      .map(([parentId, { selected, total }]) => {
+        let parent = flatList.find((n) => n.id === Number(parentId));
+        while (parent && parentMap[parent.id] && selected === total) {
+          parent = flatList.find((n) => n.id === parentMap[parent.id]);
+        }
+        return parent ? `${parent.name} (${selected}/${total})` : "";
+      });
+  };
 
   const updateHiddenTags = useCallback(() => {
     if (!inputRef.current) return;
@@ -100,8 +199,9 @@ export default function SelectWithTags() {
       if (totalWidth > inputWidth - 50) break;
       visibleCount++;
     }
-    setHiddenCount(selectedTags.length - visibleCount);
-  }, [selectedTags]);
+    // setHiddenCount(selectedTags.length - visibleCount);
+    setHiddenCount(getTagLabels().length - visibleCount);
+  }, [selectedTags, getTagLabels]);
 
   useLayoutEffect(() => {
     updateHiddenTags();
@@ -116,31 +216,6 @@ export default function SelectWithTags() {
 
     return () => observer.disconnect();
   }, [selectedTags, updateHiddenTags]);
-
-  const handleSelect = (option: string) => {
-    if (!selectedTags.includes(option)) {
-      setSelectedTags((prev) => [...prev, option]);
-    }
-  };
-
-  const handleRemove = (option: string) => {
-    setSelectedTags((prev) => prev.filter((tag) => tag !== option));
-  };
-
-  const handleOpen = (event: MouseEvent<HTMLDivElement>) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleClose = () => {
-    setAnchorEl(null);
-  };
-
-  const [checkedItems, setCheckedItems] = useState<Record<number, boolean>>({});
-  const flatList = useMemo(() => flattenTree(treeData), []);
-
-  const toggleCheck = (id: number) => {
-    setCheckedItems((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
 
   const Row = ({
     index,
@@ -161,8 +236,7 @@ export default function SelectWithTags() {
         <ListItemButton
           selected={!!checkedItems[item.id]}
           onClick={() => {
-            toggleCheck(item.id);
-            handleSelect(item.name);
+            toggleCheck(item.id, !checkedItems[item.id]);
           }}
           style={{ minWidth: 0, paddingBlock: 0 }}
           sx={{
@@ -209,22 +283,25 @@ export default function SelectWithTags() {
             overflow: "hidden",
           }}
         >
-          {selectedTags.slice(0, 30).map((tag, index) => {
-            return (
-              <Chip
-                key={tag}
-                label={tag}
-                onDelete={() => handleRemove(tag)}
-                sx={{
-                  ...(index >= selectedTags.length - hiddenCount && {
-                    position: "absolute",
-                    pointerEvents: "none",
-                    opacity: 0,
-                  }),
-                }}
-              />
-            );
-          })}
+          {/* {selectedTags.slice(0, 30).map((tag, index) => { */}
+          {getTagLabels()
+            .slice(0, 30)
+            .map((tag, index) => {
+              return (
+                <Chip
+                  key={tag}
+                  label={tag}
+                  onDelete={() => handleRemove(tag)}
+                  sx={{
+                    ...(index >= getTagLabels().length - hiddenCount && {
+                      position: "absolute",
+                      pointerEvents: "none",
+                      opacity: 0,
+                    }),
+                  }}
+                />
+              );
+            })}
           {hiddenCount > 0 && (
             <Chip
               label={`+${hiddenCount}`}
@@ -257,21 +334,6 @@ export default function SelectWithTags() {
               }}
             />
           </Box>
-          {/* {NAMES.map((option) => (
-            <Box
-              key={option}
-              sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                padding: "8px",
-                cursor: "pointer",
-                "&:hover": { bgcolor: "grey.200" },
-              }}
-              onClick={() => handleSelect(option)}
-            >
-              {option} <div>x</div>
-            </Box>
-          ))} */}
           <FixedSizeList height={300} itemCount={flatList.length} itemSize={42}>
             {Row}
           </FixedSizeList>
