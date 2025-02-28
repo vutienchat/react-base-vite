@@ -21,7 +21,8 @@ import { ArrowDropDown, Search } from "@mui/icons-material";
 import { FixedSizeList } from "react-window";
 import useResizeObserver from "./useResizeObserver";
 import Dropdown from "./Dropdown";
-// import { NAMES } from "./constants";
+import IndeterminateCheckBoxOutlinedIcon from "@mui/icons-material/IndeterminateCheckBoxOutlined";
+import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 
 interface TreeNode {
   id: number;
@@ -51,10 +52,10 @@ function generateTreeData(count: number): TreeNode[] {
     return node;
   }
 
-  return Array.from({ length: Math.min(100, count) }, () => createNode(0));
+  return Array.from({ length: Math.min(10000, count) }, () => createNode(0));
 }
 
-const treeData1: TreeNode[] = generateTreeData(10000);
+const treeData1: TreeNode[] = generateTreeData(100000);
 
 interface FlatNode extends TreeNode {
   depth: number;
@@ -86,7 +87,7 @@ const getParentIds = (
   id: number,
   parentMap: Record<number, number>
 ): number[] => {
-  let parents: number[] = [];
+  const parents: number[] = [];
   while (parentMap[id] !== undefined) {
     id = parentMap[id];
     parents.push(id);
@@ -176,7 +177,9 @@ export default function SelectWithTags() {
     });
   };
 
-  const getTagLabels = () => {
+  // console.log({ selectedCounts, checkedItems });
+
+  const tagLabels = useMemo(() => {
     return Object.entries(selectedCounts)
       .filter(([parentId, { selected, total }]) => selected > 0)
       .map(([parentId, { selected, total }]) => {
@@ -186,7 +189,7 @@ export default function SelectWithTags() {
         }
         return parent ? `${parent.name} (${selected}/${total})` : "";
       });
-  };
+  }, [flatList, parentMap, selectedCounts]);
 
   const updateHiddenTags = useCallback(() => {
     if (!inputRef.current) return;
@@ -200,8 +203,8 @@ export default function SelectWithTags() {
       visibleCount++;
     }
     // setHiddenCount(selectedTags.length - visibleCount);
-    setHiddenCount(getTagLabels().length - visibleCount);
-  }, [selectedTags, getTagLabels]);
+    setHiddenCount(tagLabels.length - visibleCount);
+  }, [tagLabels]);
 
   useLayoutEffect(() => {
     updateHiddenTags();
@@ -225,6 +228,12 @@ export default function SelectWithTags() {
     style: React.CSSProperties;
   }) => {
     const item = flatList[index];
+    const selectedCount = selectedCounts[item.id];
+    const indeterminate =
+      selectedCount &&
+      selectedCount.selected > 0 &&
+      selectedCount.selected !== selectedCount.total &&
+      !!item.children?.length;
     return (
       <Box
         style={style}
@@ -245,7 +254,12 @@ export default function SelectWithTags() {
             },
           }}
         >
-          <Checkbox checked={!!checkedItems[item.id]} readOnly />
+          <Checkbox
+            checked={!!checkedItems[item.id]}
+            readOnly
+            indeterminate={indeterminate}
+            indeterminateIcon={<IndeterminateCheckBoxOutlinedIcon />}
+          />
           <Typography
             noWrap
             sx={{
@@ -284,24 +298,27 @@ export default function SelectWithTags() {
           }}
         >
           {/* {selectedTags.slice(0, 30).map((tag, index) => { */}
-          {getTagLabels()
-            .slice(0, 30)
-            .map((tag, index) => {
-              return (
-                <Chip
-                  key={tag}
-                  label={tag}
-                  onDelete={() => handleRemove(tag)}
-                  sx={{
-                    ...(index >= getTagLabels().length - hiddenCount && {
-                      position: "absolute",
-                      pointerEvents: "none",
-                      opacity: 0,
-                    }),
-                  }}
-                />
-              );
-            })}
+          {tagLabels.slice(0, 30).map((tag, index) => {
+            return (
+              <Chip
+                key={tag}
+                label={tag}
+                deleteIcon={<CloseOutlinedIcon />}
+                onDelete={() => handleRemove(tag)}
+                sx={{
+                  borderRadius: 1.5,
+                  "& .MuiChip-deleteIcon": {
+                    fontSize: 15,
+                  },
+                  ...(index >= tagLabels.length - hiddenCount && {
+                    position: "absolute",
+                    pointerEvents: "none",
+                    opacity: 0,
+                  }),
+                }}
+              />
+            );
+          })}
           {hiddenCount > 0 && (
             <Chip
               label={`+${hiddenCount}`}
@@ -334,7 +351,12 @@ export default function SelectWithTags() {
               }}
             />
           </Box>
-          <FixedSizeList height={300} itemCount={flatList.length} itemSize={42}>
+          <FixedSizeList
+            width={"100%"}
+            height={300}
+            itemCount={flatList.length}
+            itemSize={42}
+          >
             {Row}
           </FixedSizeList>
         </Paper>

@@ -28,11 +28,10 @@ function App() {
           width: "50%",
           margin: "0 auto",
           flexDirection: "column",
-          gap: 30,
+          gap: 40,
         }}
       >
         <FormProvider {...methods}>
-          <TagInput />
           <CustomAutocomplete
             variant="standard"
             renderLabel={(option) => (
@@ -107,6 +106,7 @@ function App() {
             heightOption={56}
             placeholder="placeholder"
           />
+          <TagInput />
         </FormProvider>
       </Box>
     </ThemeProvider>
