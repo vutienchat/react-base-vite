@@ -28,7 +28,7 @@ interface Props<O extends FieldValues, V extends string | number>
   heightOption?: number;
 }
 
-const ProFormSelect = <
+const CustomAutocomplete = <
   O extends FieldValues & { value: V; label: string },
   V extends string | number
 >(
@@ -146,4 +146,4 @@ const ProFormSelect = <
   );
 };
 
-export default ProFormSelect;
+export default CustomAutocomplete;

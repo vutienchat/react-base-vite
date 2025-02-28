@@ -6,8 +6,8 @@ import {
   Typography,
 } from "@mui/material";
 import TagInput from "./components/SelectWithTags";
-import CustomAutocomplete from "./components/CustomAutocomplete";
 import { FormProvider, useForm } from "react-hook-form";
+import CustomAutocomplete from "./components/CustomAutocomplete";
 
 const theme = createTheme({
   palette: {

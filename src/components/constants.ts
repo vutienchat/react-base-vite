@@ -50,3 +50,39 @@ export const NAMES: string[] = [
   "Walter",
   "Xander",
 ];
+
+export const treeData: any[] = [
+  {
+    id: 1,
+    name: "Nhóm kênh bán hàng trực tiếp",
+    children: [
+      { id: 2, name: "14/ Kênh nhân viên" },
+      {
+        id: 3,
+        name: "1001527/ Kênh hộ kinh doanh",
+      },
+    ],
+  },
+  {
+    id: 4,
+    name: "Nhóm kênh khác",
+    children: [
+      { id: 5, name: "1000499/ Kênh đại lý ủy quyền doanh nghiệp" },
+      {
+        id: 6,
+        name: "6/ Kênh đại lý XNK",
+      },
+    ],
+  },
+  {
+    id: 7,
+    name: "Nhóm kênh khác 2",
+    children: [
+      { id: 8, name: "7/ Kênh đại lý XNK" },
+      {
+        id: 9,
+        name: "8/ Kênh đại lý XNK",
+      },
+    ],
+  },
+];
