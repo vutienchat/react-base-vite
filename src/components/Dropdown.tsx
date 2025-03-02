@@ -52,6 +52,7 @@ const Dropdown: React.FC<DropdownProps> = ({
                 ? "center top"
                 : "center bottom",
             }}
+            timeout={250}
           >
             <Box>{children}</Box>
           </Grow>

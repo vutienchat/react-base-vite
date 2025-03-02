@@ -5,6 +5,7 @@ import {
   useLayoutEffect,
   useCallback,
   useMemo,
+  useEffect,
 } from "react";
 import {
   Chip,
@@ -21,7 +22,9 @@ import { ArrowDropDown, Search } from "@mui/icons-material";
 import { FixedSizeList } from "react-window";
 import useResizeObserver from "./useResizeObserver";
 import Dropdown from "./Dropdown";
-// import { NAMES } from "./constants";
+import IndeterminateCheckBoxOutlinedIcon from "@mui/icons-material/IndeterminateCheckBoxOutlined";
+import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
+import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
 
 interface TreeNode {
   id: number;
@@ -42,7 +45,7 @@ function generateTreeData(count: number): TreeNode[] {
     };
 
     if (level < 1 && id < count) {
-      const childrenCount = Math.floor(Math.random() * 10) + 1;
+      const childrenCount = Math.floor(Math.random() * 3) + 1;
       node.children = Array.from({ length: childrenCount }, () =>
         createNode(level + 1)
       );
@@ -51,10 +54,10 @@ function generateTreeData(count: number): TreeNode[] {
     return node;
   }
 
-  return Array.from({ length: Math.min(100, count) }, () => createNode(0));
+  return Array.from({ length: Math.min(10, count) }, () => createNode(0));
 }
 
-const treeData1: TreeNode[] = generateTreeData(10000);
+const treeData1: TreeNode[] = generateTreeData(100);
 
 interface FlatNode extends TreeNode {
   depth: number;
@@ -86,7 +89,7 @@ const getParentIds = (
   id: number,
   parentMap: Record<number, number>
 ): number[] => {
-  let parents: number[] = [];
+  const parents: number[] = [];
   while (parentMap[id] !== undefined) {
     id = parentMap[id];
     parents.push(id);
@@ -110,17 +113,18 @@ const buildParentMap = (
   return map;
 };
 
-export default function SelectWithTags() {
-  const [hiddenCount, setHiddenCount] = useState<number>(0);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+export default function SelectWithTags({ value }: { value?: number[] }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLDivElement | null>(null);
   const { width } = useResizeObserver(containerRef);
-
-  const handleRemove = (option: string) => {
-    setSelectedTags((prev) => prev.filter((tag) => tag !== option));
-  };
+  const [hiddenCount, setHiddenCount] = useState<number>(0);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [selectedCounts, setSelectedCounts] = useState(
+    new Map<number, { total: number; selected: number }>()
+  );
+  const [checkedItems, setCheckedItems] = useState<Record<number, boolean>>({});
+  const flatList = useMemo(() => flattenTree(treeData1), []);
+  const parentMap = useMemo(() => buildParentMap(treeData1), []);
 
   const handleOpen = (event: MouseEvent<HTMLDivElement>) => {
     setAnchorEl(event.currentTarget);
@@ -128,65 +132,199 @@ export default function SelectWithTags() {
 
   const handleClose = () => {
     setAnchorEl(null);
-  };
-  const [selectedCounts, setSelectedCounts] = useState<
-    Record<number, { total: number; selected: number }>
-  >({});
-  const [checkedItems, setCheckedItems] = useState<Record<number, boolean>>({});
-  const flatList = useMemo(() => flattenTree(treeData1), []);
-  const parentMap = useMemo(() => buildParentMap(treeData1), []);
-
-  const updateSelectedCounts = (newChecked: Record<number, boolean>) => {
-    const counts: Record<number, { total: number; selected: number }> = {};
-    flatList.forEach((node) => {
-      if (node.children) {
-        const total = node.children.length;
-        const selected = node.children.filter(
-          (child) => newChecked[child.id]
-        ).length;
-        counts[node.id] = { total, selected };
-      }
-    });
-    setSelectedCounts(counts);
+    console.log({ checkedItems });
   };
 
-  const toggleCheck = (id: number, checked: boolean) => {
-    setCheckedItems((prev) => {
-      const newChecked = { ...prev };
-      newChecked[id] = checked;
-
-      const node = flatList.find((n) => n.id === id);
-      if (node?.children) {
-        node.children.forEach((child) => {
+  const updateCheckedItems = (
+    id: number,
+    checked: boolean,
+    newChecked: Record<number, boolean>
+  ) => {
+    const node = flatList.find((n) => n.id === id);
+    if (node?.children) {
+      node.children.forEach((child) => {
+        if (checked) {
           newChecked[child.id] = checked;
-        });
-      }
-
-      getParentIds(id, parentMap).forEach((parentId) => {
-        const parentNode = flatList.find((n) => n.id === parentId);
-        if (parentNode?.children) {
-          newChecked[parentId] = parentNode.children.every(
-            (child) => newChecked[child.id]
-          );
+        } else {
+          delete newChecked[child.id];
         }
       });
+    }
+    getParentIds(id, parentMap).forEach((parentId) => {
+      const parentNode = flatList.find((n) => n.id === parentId);
+      if (parentNode?.children) {
+        const allChildrenChecked = parentNode.children.every(
+          (child) => newChecked[child.id]
+        );
+        if (checked) {
+          newChecked[parentId] = allChildrenChecked;
+        } else {
+          delete newChecked[parentId];
+        }
+      }
+    });
+  };
 
-      updateSelectedCounts(newChecked);
+  // const updateCheckedItems = (
+  //   id: number,
+  //   checked: boolean,
+  //   newChecked: Record<number, boolean>
+  // ) => {
+  //   const queue = [id];
+  //   while (queue.length) {
+  //     const currentId = queue.pop();
+  //     if (currentId !== undefined) {
+  //       newChecked[currentId] = checked;
+  //       const children =
+  //         flatList.find((node) => node.id === currentId)?.children || [];
+  //       queue.push(...children.map((child) => child.id));
+  //     }
+  //   }
+  //   getParentIds(id, parentMap).forEach((parentId) => {
+  //     const parentNode = flatList.find((n) => n.id === parentId);
+  //     if (parentNode?.children?.every((child) => newChecked[child.id])) {
+  //       newChecked[parentId] = true;
+  //     } else {
+  //       delete newChecked[parentId];
+  //     }
+  //   });
+  // };
+
+  const handleRemove = (id: number) => {
+    // setCheckedItems((prev) => {
+    //   const newChecked = { ...prev };
+    //   // updateCheckedItems(id, false, newChecked);
+    //   const node = flatList.find((n) => n.id === id);
+
+    //   if (node) {
+    //     delete newChecked[node.id];
+
+    //     if (node.children) {
+    //       node.children.forEach((child) => {
+    //         delete newChecked[child.id];
+    //       });
+    //     }
+
+    //     getParentIds(node.id, parentMap).forEach((parentId) => {
+    //       const parentNode = flatList.find((n) => n.id === parentId);
+    //       if (parentNode?.children) {
+    //         const allChildrenUnchecked = parentNode.children.every(
+    //           (child) => !newChecked[child.id]
+    //         );
+    //         if (allChildrenUnchecked) {
+    //           delete newChecked[parentId];
+    //         }
+    //       }
+    //     });
+
+    //     updateSelectedCounts(node.id, newChecked);
+    //   }
+
+    //   return newChecked;
+    // });
+
+    setCheckedItems((prev) => {
+      const newChecked = { ...prev };
+      delete newChecked[id];
+      updateCheckedItems(id, false, newChecked);
+      updateSelectedCounts(id, newChecked);
       return newChecked;
     });
   };
 
-  const getTagLabels = () => {
-    return Object.entries(selectedCounts)
-      .filter(([parentId, { selected, total }]) => selected > 0)
+  const toggleCheck = (id: number, checked: boolean) => {
+    // setCheckedItems((prev) => {
+    //   const newChecked = { ...prev, [id]: checked };
+
+    //   const node = flatList.find((n) => n.id === id);
+    //   if (node?.children) {
+    //     node.children.forEach((child) => {
+    //       newChecked[child.id] = checked;
+    //     });
+    //   }
+
+    //   getParentIds(id, parentMap).forEach((parentId) => {
+    //     const parentNode = flatList.find((n) => n.id === parentId);
+    //     if (parentNode?.children) {
+    //       const allChildrenChecked = parentNode.children.every(
+    //         (child) => newChecked[child.id]
+    //       );
+    //       newChecked[parentId] = allChildrenChecked;
+    //     }
+    //   });
+
+    //   updateSelectedCounts(id, newChecked);
+
+    //   return newChecked;
+    // });
+
+    setCheckedItems((prev) => {
+      const newChecked = { ...prev, [id]: checked };
+      updateCheckedItems(id, checked, newChecked);
+      updateSelectedCounts(id, newChecked);
+      return newChecked;
+    });
+  };
+
+  const updateSelectedCounts = (
+    nodeId: number,
+    newChecked: Record<number, boolean>
+  ) => {
+    // setSelectedCounts((prev) => {
+    //   const newCounts = new Map(prev);
+    //   const updateNodeCount = (id: number) => {
+    //     const node = flatList.find((n) => n.id === id);
+    //     if (node?.children) {
+    //       const total = node.children.length;
+    //       const selected = node.children.filter(
+    //         (child) => newChecked[child.id]
+    //       ).length;
+    //       if (selected) {
+    //         newCounts.set(id, { total, selected });
+    //       } else {
+    //         newCounts.delete(id);
+    //       }
+    //     }
+    //   };
+
+    //   updateNodeCount(nodeId);
+    //   getParentIds(nodeId, parentMap).forEach(updateNodeCount);
+
+    //   return newCounts;
+    // });
+
+    setSelectedCounts((prev) => {
+      const newCounts = new Map(prev);
+      [nodeId, ...getParentIds(nodeId, parentMap)].forEach((id) => {
+        const node = flatList.find((n) => n.id === id);
+        if (node?.children) {
+          const total = node.children.length;
+          const selected = node.children.filter(
+            (child) => newChecked[child.id]
+          ).length;
+          selected
+            ? newCounts.set(id, { total, selected })
+            : newCounts.delete(id);
+        }
+      });
+      return newCounts;
+    });
+  };
+
+  const tagLabels = useMemo(() => {
+    return Array.from(selectedCounts.entries())
+      .filter(([_, { selected }]) => selected > 0)
       .map(([parentId, { selected, total }]) => {
         let parent = flatList.find((n) => n.id === Number(parentId));
         while (parent && parentMap[parent.id] && selected === total) {
           parent = flatList.find((n) => n.id === parentMap[parent.id]);
         }
-        return parent ? `${parent.name} (${selected}/${total})` : "";
-      });
-  };
+        return parent
+          ? { id: parent.id, label: `${parent.name} (${selected}/${total})` }
+          : null;
+      })
+      .filter(Boolean) as { id: number; label: string }[];
+  }, [flatList, parentMap, selectedCounts]);
 
   const updateHiddenTags = useCallback(() => {
     if (!inputRef.current) return;
@@ -199,9 +337,8 @@ export default function SelectWithTags() {
       if (totalWidth > inputWidth - 50) break;
       visibleCount++;
     }
-    // setHiddenCount(selectedTags.length - visibleCount);
-    setHiddenCount(getTagLabels().length - visibleCount);
-  }, [selectedTags, getTagLabels]);
+    setHiddenCount(tagLabels.length - visibleCount);
+  }, [tagLabels]);
 
   useLayoutEffect(() => {
     updateHiddenTags();
@@ -215,7 +352,76 @@ export default function SelectWithTags() {
     }
 
     return () => observer.disconnect();
-  }, [selectedTags, updateHiddenTags]);
+  }, [updateHiddenTags]);
+
+  useEffect(() => {
+    if (!value) return;
+    const newChecked: Record<number, boolean> = {};
+    const newCounts = new Map();
+    const updateNodeCount = (id: number) => {
+      const node = flatList.find((n) => n.id === id);
+      if (node?.children) {
+        const total = node.children.length;
+        const selected = node.children.filter(
+          (child) => newChecked[child.id]
+        ).length;
+        if (selected) {
+          newCounts.set(id, { total, selected });
+        } else {
+          newCounts.delete(id);
+        }
+      }
+    };
+    value.forEach((id) => {
+      newChecked[id] = true;
+      const node = flatList.find((n) => n.id === id);
+      if (node?.children) {
+        node.children.forEach((child) => {
+          newChecked[child.id] = true;
+        });
+      }
+
+      getParentIds(id, parentMap).forEach((parentId) => {
+        const parentNode = flatList.find((n) => n.id === parentId);
+        if (parentNode?.children) {
+          const allChildrenChecked = parentNode.children.every(
+            (child) => newChecked[child.id]
+          );
+          if (allChildrenChecked) {
+            newChecked[parentId] = allChildrenChecked;
+          } else {
+            delete newChecked[parentId];
+          }
+        }
+      });
+      updateNodeCount(id);
+      getParentIds(id, parentMap).forEach(updateNodeCount);
+    });
+
+    setCheckedItems(newChecked);
+    setSelectedCounts(newCounts);
+
+    // if (!value) return;
+    // const newChecked: Record<number, boolean> = {};
+    // const newCounts = new Map<number, { total: number; selected: number }>();
+
+    // value.forEach((id) => {
+    //   newChecked[id] = true;
+    //   const node = flatList.find((n) => n.id === id);
+    //   if (node?.children) {
+    //     node.children.forEach((child) => {
+    //       newChecked[child.id] = true;
+    //     });
+    //     newCounts.set(id, {
+    //       total: node.children.length,
+    //       selected: node.children.length,
+    //     });
+    //   }
+    // });
+
+    // setCheckedItems(newChecked);
+    // setSelectedCounts(newCounts);
+  }, [value]);
 
   const Row = ({
     index,
@@ -225,6 +431,12 @@ export default function SelectWithTags() {
     style: React.CSSProperties;
   }) => {
     const item = flatList[index];
+    const selectedCount = selectedCounts.get(item.id);
+    const indeterminate =
+      selectedCount &&
+      selectedCount.selected > 0 &&
+      selectedCount.selected !== selectedCount.total &&
+      !!item.children?.length;
     return (
       <Box
         style={style}
@@ -245,7 +457,13 @@ export default function SelectWithTags() {
             },
           }}
         >
-          <Checkbox checked={!!checkedItems[item.id]} readOnly />
+          <Checkbox
+            checked={!!checkedItems[item.id]}
+            readOnly
+            indeterminate={indeterminate}
+            indeterminateIcon={<IndeterminateCheckBoxOutlinedIcon />}
+            name={`row-checkbox-${item.id}`}
+          />
           <Typography
             noWrap
             sx={{
@@ -283,25 +501,25 @@ export default function SelectWithTags() {
             overflow: "hidden",
           }}
         >
-          {/* {selectedTags.slice(0, 30).map((tag, index) => { */}
-          {getTagLabels()
-            .slice(0, 30)
-            .map((tag, index) => {
-              return (
-                <Chip
-                  key={tag}
-                  label={tag}
-                  onDelete={() => handleRemove(tag)}
-                  sx={{
-                    ...(index >= getTagLabels().length - hiddenCount && {
-                      position: "absolute",
-                      pointerEvents: "none",
-                      opacity: 0,
-                    }),
-                  }}
-                />
-              );
-            })}
+          {tagLabels.slice(0, 30).map(({ id, label }, index) => (
+            <Chip
+              key={id}
+              label={label}
+              deleteIcon={<CloseOutlinedIcon />}
+              onDelete={() => handleRemove(id)}
+              sx={{
+                borderRadius: 1.5,
+                "& .MuiChip-deleteIcon": {
+                  fontSize: 15,
+                },
+                ...(index >= tagLabels.length - hiddenCount && {
+                  position: "absolute",
+                  pointerEvents: "none",
+                  opacity: 0,
+                }),
+              }}
+            />
+          ))}
           {hiddenCount > 0 && (
             <Chip
               label={`+${hiddenCount}`}
@@ -310,7 +528,7 @@ export default function SelectWithTags() {
           )}
         </Box>
         <IconButton size="small">
-          <ArrowDropDown />
+          {!!anchorEl ? <ArrowDropUpIcon /> : <ArrowDropDown />}
         </IconButton>
       </Box>
       <Dropdown
@@ -334,7 +552,12 @@ export default function SelectWithTags() {
               }}
             />
           </Box>
-          <FixedSizeList height={300} itemCount={flatList.length} itemSize={42}>
+          <FixedSizeList
+            width={"100%"}
+            height={300}
+            itemCount={flatList.length}
+            itemSize={42}
+          >
             {Row}
           </FixedSizeList>
         </Paper>
