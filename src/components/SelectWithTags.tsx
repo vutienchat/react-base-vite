@@ -156,7 +156,7 @@ export default function SelectWithTags({ value }: { value?: number[] }) {
         const allChildrenChecked = parentNode.children.every(
           (child) => newChecked[child.id]
         );
-        if (checked) {
+        if (allChildrenChecked) {
           newChecked[parentId] = allChildrenChecked;
         } else {
           delete newChecked[parentId];
