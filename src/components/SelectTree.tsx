@@ -25,36 +25,12 @@ import Dropdown from "./Dropdown";
 import IndeterminateCheckBoxOutlinedIcon from "@mui/icons-material/IndeterminateCheckBoxOutlined";
 import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
+import { generateTreeData } from "./SelectWithTags";
 
 interface TreeNode {
   id: number;
   name: string;
   children?: TreeNode[];
-}
-
-export function generateTreeData(count: number): TreeNode[] {
-  let id = 1;
-
-  function createNode(level: number): TreeNode {
-    const node: TreeNode = {
-      id: id++,
-      name:
-        level === 0
-          ? `Nhóm kênh bán hàng trực tiếp ${id}`
-          : `${id}/ Kênh đại lý XNK`,
-    };
-
-    if (level < 2 && id < count) {
-      const childrenCount = Math.floor(Math.random() * 3) + 1;
-      node.children = Array.from({ length: childrenCount }, () =>
-        createNode(level + 1)
-      );
-    }
-
-    return node;
-  }
-
-  return Array.from({ length: Math.min(10, count) }, () => createNode(0));
 }
 
 const treeData1: TreeNode[] = generateTreeData(100);
@@ -69,7 +45,7 @@ const flattenTree = (nodes: TreeNode[], depth = 0): FlatNode[] => {
   nodes.forEach((node, index, array) => {
     result.push({ ...node, depth, isLast: index === array.length - 1 });
     if (node.children) {
-      result = result.concat(flattenTree(node.children, depth + 1));
+      result = result.concat(flattenTree(node.children, depth + 1, node.id));
     }
   });
   return result;
@@ -113,7 +89,7 @@ const buildParentMap = (
   return map;
 };
 
-export default function SelectWithTags({ value }: { value?: number[] }) {
+const SelectTree = ({ value }: { value?: number[] }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLDivElement | null>(null);
   const { width } = useResizeObserver(containerRef);
@@ -165,64 +141,7 @@ export default function SelectWithTags({ value }: { value?: number[] }) {
     });
   };
 
-  // const updateCheckedItems = (
-  //   id: number,
-  //   checked: boolean,
-  //   newChecked: Record<number, boolean>
-  // ) => {
-  //   const queue = [id];
-  //   while (queue.length) {
-  //     const currentId = queue.pop();
-  //     if (currentId !== undefined) {
-  //       newChecked[currentId] = checked;
-  //       const children =
-  //         flatList.find((node) => node.id === currentId)?.children || [];
-  //       queue.push(...children.map((child) => child.id));
-  //     }
-  //   }
-  //   getParentIds(id, parentMap).forEach((parentId) => {
-  //     const parentNode = flatList.find((n) => n.id === parentId);
-  //     if (parentNode?.children?.every((child) => newChecked[child.id])) {
-  //       newChecked[parentId] = true;
-  //     } else {
-  //       delete newChecked[parentId];
-  //     }
-  //   });
-  // };
-
   const handleRemove = (id: number) => {
-    // setCheckedItems((prev) => {
-    //   const newChecked = { ...prev };
-    //   // updateCheckedItems(id, false, newChecked);
-    //   const node = flatList.find((n) => n.id === id);
-
-    //   if (node) {
-    //     delete newChecked[node.id];
-
-    //     if (node.children) {
-    //       node.children.forEach((child) => {
-    //         delete newChecked[child.id];
-    //       });
-    //     }
-
-    //     getParentIds(node.id, parentMap).forEach((parentId) => {
-    //       const parentNode = flatList.find((n) => n.id === parentId);
-    //       if (parentNode?.children) {
-    //         const allChildrenUnchecked = parentNode.children.every(
-    //           (child) => !newChecked[child.id]
-    //         );
-    //         if (allChildrenUnchecked) {
-    //           delete newChecked[parentId];
-    //         }
-    //       }
-    //     });
-
-    //     updateSelectedCounts(node.id, newChecked);
-    //   }
-
-    //   return newChecked;
-    // });
-
     setCheckedItems((prev) => {
       const newChecked = { ...prev };
       delete newChecked[id];
@@ -233,31 +152,6 @@ export default function SelectWithTags({ value }: { value?: number[] }) {
   };
 
   const toggleCheck = (id: number, checked: boolean) => {
-    // setCheckedItems((prev) => {
-    //   const newChecked = { ...prev, [id]: checked };
-
-    //   const node = flatList.find((n) => n.id === id);
-    //   if (node?.children) {
-    //     node.children.forEach((child) => {
-    //       newChecked[child.id] = checked;
-    //     });
-    //   }
-
-    //   getParentIds(id, parentMap).forEach((parentId) => {
-    //     const parentNode = flatList.find((n) => n.id === parentId);
-    //     if (parentNode?.children) {
-    //       const allChildrenChecked = parentNode.children.every(
-    //         (child) => newChecked[child.id]
-    //       );
-    //       newChecked[parentId] = allChildrenChecked;
-    //     }
-    //   });
-
-    //   updateSelectedCounts(id, newChecked);
-
-    //   return newChecked;
-    // });
-
     setCheckedItems((prev) => {
       const newChecked = { ...prev, [id]: checked };
       updateCheckedItems(id, checked, newChecked);
@@ -270,29 +164,6 @@ export default function SelectWithTags({ value }: { value?: number[] }) {
     nodeId: number,
     newChecked: Record<number, boolean>
   ) => {
-    // setSelectedCounts((prev) => {
-    //   const newCounts = new Map(prev);
-    //   const updateNodeCount = (id: number) => {
-    //     const node = flatList.find((n) => n.id === id);
-    //     if (node?.children) {
-    //       const total = node.children.length;
-    //       const selected = node.children.filter(
-    //         (child) => newChecked[child.id]
-    //       ).length;
-    //       if (selected) {
-    //         newCounts.set(id, { total, selected });
-    //       } else {
-    //         newCounts.delete(id);
-    //       }
-    //     }
-    //   };
-
-    //   updateNodeCount(nodeId);
-    //   getParentIds(nodeId, parentMap).forEach(updateNodeCount);
-
-    //   return newCounts;
-    // });
-
     setSelectedCounts((prev) => {
       const newCounts = new Map(prev);
       [nodeId, ...getParentIds(nodeId, parentMap)].forEach((id) => {
@@ -400,27 +271,6 @@ export default function SelectWithTags({ value }: { value?: number[] }) {
 
     setCheckedItems(newChecked);
     setSelectedCounts(newCounts);
-
-    // if (!value) return;
-    // const newChecked: Record<number, boolean> = {};
-    // const newCounts = new Map<number, { total: number; selected: number }>();
-
-    // value.forEach((id) => {
-    //   newChecked[id] = true;
-    //   const node = flatList.find((n) => n.id === id);
-    //   if (node?.children) {
-    //     node.children.forEach((child) => {
-    //       newChecked[child.id] = true;
-    //     });
-    //     newCounts.set(id, {
-    //       total: node.children.length,
-    //       selected: node.children.length,
-    //     });
-    //   }
-    // });
-
-    // setCheckedItems(newChecked);
-    // setSelectedCounts(newCounts);
   }, [value]);
 
   const Row = ({
@@ -564,4 +414,6 @@ export default function SelectWithTags({ value }: { value?: number[] }) {
       </Dropdown>
     </Box>
   );
-}
+};
+
+export default SelectTree;

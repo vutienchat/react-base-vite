@@ -8,6 +8,8 @@ import {
 import TagInput from "./components/SelectWithTags";
 import { FormProvider, useForm } from "react-hook-form";
 import CustomAutocomplete from "./components/CustomAutocomplete";
+import DateRangePicker from "./components/DateRangePicker";
+import SelectTree from "./components/SelectTree";
 
 const theme = createTheme({
   palette: {
@@ -32,7 +34,9 @@ function App() {
         }}
       >
         <FormProvider {...methods}>
-          <TagInput value={[20, 13, 1]} />
+          {/* <TagInput value={[20, 13, 1]} /> */}
+          <SelectTree />
+          <DateRangePicker />
           <CustomAutocomplete
             variant="standard"
             renderLabel={(option) => (
