@@ -130,6 +130,28 @@ const SelectTree = ({ value }: { value?: number[] }) => {
     console.log({ checkedItems });
   };
 
+  const allChecked = useMemo(() => {
+    return (
+      flatList.length > 0 && flatList.every((node) => checkedItems[node.id])
+    );
+  }, [checkedItems, flatList]);
+
+  const indeterminate = useMemo(() => {
+    return !allChecked && Object.keys(checkedItems).length > 0;
+  }, [allChecked, checkedItems]);
+
+  const handleSelectAll = () => {
+    if (allChecked) {
+      setCheckedItems({});
+    } else {
+      const newChecked: Record<number, boolean> = {};
+      flatList.forEach((node) => {
+        newChecked[node.id] = true;
+      });
+      setCheckedItems(newChecked);
+    }
+  };
+
   const updateCheckedItems = (
     id: number,
     checked: boolean,
@@ -424,15 +446,10 @@ const SelectTree = ({ value }: { value?: number[] }) => {
               }}
             />
           </Box>
-          <Box
-            // className={cnParentId}
-            sx={{ borderBottom: "1px solid #F2F2F2" }}
-          >
+          <Box sx={{ borderBottom: "1px solid #F2F2F2" }}>
             <ListItemButton
-              // selected={!!checkedItems[item.id]}
-              // onClick={() => {
-              //   toggleCheck(item.id, !checkedItems[item.id]);
-              // }}
+              selected={allChecked}
+              onClick={handleSelectAll}
               style={{ minWidth: 0, paddingBlock: 0 }}
               sx={{
                 "&.Mui-selected": {
@@ -441,9 +458,9 @@ const SelectTree = ({ value }: { value?: number[] }) => {
               }}
             >
               <Checkbox
-                // checked={!!checkedItems[item.id]}
+                checked={allChecked}
                 readOnly
-                // indeterminate={indeterminate}
+                indeterminate={indeterminate}
                 indeterminateIcon={<IndeterminateCheckBoxOutlinedIcon />}
               />
               <Typography
