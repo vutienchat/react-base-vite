@@ -33,23 +33,40 @@ interface TreeNode {
   children?: TreeNode[];
 }
 
-const treeData1: TreeNode[] = generateTreeData(100);
+const treeData: TreeNode[] = generateTreeData(100);
 
 interface FlatNode extends TreeNode {
   depth: number;
-  isLast: boolean;
+  isFirst?: boolean;
 }
 
 const flattenTree = (nodes: TreeNode[], depth = 0): FlatNode[] => {
   let result: FlatNode[] = [];
-  nodes.forEach((node, index, array) => {
-    result.push({ ...node, depth, isLast: index === array.length - 1 });
+  nodes.forEach((node) => {
+    result.push({ ...node, depth });
     if (node.children) {
-      result = result.concat(flattenTree(node.children, depth + 1, node.id));
+      result = result.concat(flattenTree(node.children, depth + 1));
     }
   });
   return result;
 };
+
+// function flattenTree(
+//   arr: TreeNode[],
+//   parentId: number | null = null,
+//   depth: number = 0
+// ): FlatNode[] {
+//   return arr.reduce<FlatNode[]>((acc, item) => {
+//     const newItem = { ...item, id: item.id, name: item.name, parentId, depth };
+//     acc.push(newItem);
+
+//     if (item.children) {
+//       acc.push(...flattenTree(item?.children || [], item.id, depth + 1));
+//     }
+
+//     return acc;
+//   }, []);
+// }
 
 const getAllChildIds = (node: TreeNode): number[] => {
   let ids = [node.id];
@@ -88,6 +105,8 @@ const buildParentMap = (
   });
   return map;
 };
+const addIsFirstFlag = (treeData: TreeNode[]) =>
+  treeData.map((item) => ({ ...item, isFirst: true }));
 
 const SelectTree = ({ value }: { value?: number[] }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -99,8 +118,8 @@ const SelectTree = ({ value }: { value?: number[] }) => {
     new Map<number, { total: number; selected: number }>()
   );
   const [checkedItems, setCheckedItems] = useState<Record<number, boolean>>({});
-  const flatList = useMemo(() => flattenTree(treeData1), []);
-  const parentMap = useMemo(() => buildParentMap(treeData1), []);
+  const flatList = useMemo(() => flattenTree(addIsFirstFlag(treeData)), []);
+  const parentMap = useMemo(() => buildParentMap(treeData), []);
 
   const handleOpen = (event: MouseEvent<HTMLDivElement>) => {
     setAnchorEl(event.currentTarget);
@@ -173,9 +192,11 @@ const SelectTree = ({ value }: { value?: number[] }) => {
           const selected = node.children.filter(
             (child) => newChecked[child.id]
           ).length;
-          selected
-            ? newCounts.set(id, { total, selected })
-            : newCounts.delete(id);
+          if (selected) {
+            newCounts.set(id, { total, selected });
+          } else {
+            newCounts.delete(id);
+          }
         }
       });
       return newCounts;
@@ -271,7 +292,7 @@ const SelectTree = ({ value }: { value?: number[] }) => {
 
     setCheckedItems(newChecked);
     setSelectedCounts(newCounts);
-  }, [value]);
+  }, [value, flatList, parentMap]);
 
   const Row = ({
     index,
@@ -287,12 +308,13 @@ const SelectTree = ({ value }: { value?: number[] }) => {
       selectedCount.selected > 0 &&
       selectedCount.selected !== selectedCount.total &&
       !!item.children?.length;
+
     return (
       <Box
         style={style}
         sx={{
           paddingLeft: `${item.depth * 20}px`,
-          ...(item.isLast && { borderBottom: "1px solid #F2F2F2" }),
+          ...(item.isFirst && { borderTop: "1px solid #F2F2F2" }),
         }}
       >
         <ListItemButton
@@ -401,6 +423,39 @@ const SelectTree = ({ value }: { value?: number[] }) => {
                 ),
               }}
             />
+          </Box>
+          <Box
+            // className={cnParentId}
+            sx={{ borderBottom: "1px solid #F2F2F2" }}
+          >
+            <ListItemButton
+              // selected={!!checkedItems[item.id]}
+              // onClick={() => {
+              //   toggleCheck(item.id, !checkedItems[item.id]);
+              // }}
+              style={{ minWidth: 0, paddingBlock: 0 }}
+              sx={{
+                "&.Mui-selected": {
+                  backgroundColor: "#F2F2F2",
+                },
+              }}
+            >
+              <Checkbox
+                // checked={!!checkedItems[item.id]}
+                readOnly
+                // indeterminate={indeterminate}
+                indeterminateIcon={<IndeterminateCheckBoxOutlinedIcon />}
+              />
+              <Typography
+                noWrap
+                sx={{
+                  flexGrow: 1,
+                }}
+                color={"#292929"}
+              >
+                Chọn tất cả
+              </Typography>
+            </ListItemButton>
           </Box>
           <FixedSizeList
             width={"100%"}

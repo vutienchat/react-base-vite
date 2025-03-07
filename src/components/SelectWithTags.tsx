@@ -44,7 +44,7 @@ export function generateTreeData(count: number): TreeNode[] {
           : `${id}/ Kênh đại lý XNK`,
     };
 
-    if (level < 2 && id < count) {
+    if (level < 1 && id < count) {
       const childrenCount = Math.floor(Math.random() * 3) + 1;
       node.children = Array.from({ length: childrenCount }, () =>
         createNode(level + 1)
