@@ -75,15 +75,32 @@ const flattenTree = (nodes: TreeNode[], depth = 0): FlatNode[] => {
   return result;
 };
 
-const getAllChildIds = (node: TreeNode): number[] => {
-  let ids = [node.id];
-  if (node.children) {
-    node.children.forEach((child) => {
-      ids = ids.concat(getAllChildIds(child));
-    });
-  }
-  return ids;
-};
+// function flattenTree(
+//   arr: TreeNode[],
+//   parentId: number | null = null,
+//   depth: number = 0
+// ): FlatNode[] {
+//   return arr.reduce<FlatNode[]>((acc, item) => {
+//     const newItem = { ...item, id: item.id, name: item.name, parentId, depth };
+//     acc.push(newItem);
+
+//     if (item.children) {
+//       acc.push(...flattenTree(item?.children || [], item.id, depth + 1));
+//     }
+
+//     return acc;
+//   }, []);
+// }
+
+// const getAllChildIds = (node: TreeNode): number[] => {
+//   let ids = [node.id];
+//   if (node.children) {
+//     node.children.forEach((child) => {
+//       ids = ids.concat(getAllChildIds(child));
+//     });
+//   }
+//   return ids;
+// };
 
 const getParentIds = (
   id: number,

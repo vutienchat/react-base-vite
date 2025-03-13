@@ -30,25 +30,34 @@ type IValue = number | string;
 interface IOption {
   value: IValue;
   label: string;
-  children?: IOption[];
-  [x: string]: any;
+  children?: FlatNode[];
+  //   [x: string]: any;
 }
+
+interface FlatNode extends IOption {
+  depth?: number;
+  parentId?: IValue | null;
+  isFirst?: boolean;
+}
+
 interface ISelectTreeProps {
   options: IOption[];
   value?: number[];
   onChange?: (value: (string | number)[]) => void;
 }
-interface FlatNode extends IOption {
-  depth: number;
-  isFirst?: boolean;
-}
 
-const flattenTree = (nodes: IOption[], depth = 0): FlatNode[] => {
+const flattenTree = (
+  nodes: IOption[],
+  depth = 0,
+  parentId: IValue | null = null
+): FlatNode[] => {
   let result: FlatNode[] = [];
   nodes.forEach((node) => {
-    result.push({ ...node, depth });
+    result.push({ ...node, depth, parentId });
     if (node.children) {
-      result = result.concat(flattenTree(node.children, depth + 1));
+      result = result.concat(
+        flattenTree(node.children as FlatNode[], depth + 1, node.value)
+      );
     }
   });
   return result;
@@ -85,7 +94,7 @@ const buildParentMap = (
 const addIsFirstFlag = (data: IOption[]) =>
   data.map((item) => ({ ...item, isFirst: true }));
 
-const SelectTree = (props: ISelectTreeProps) => {
+const SelectTree2 = (props: ISelectTreeProps) => {
   const { value, onChange, options = [] } = props;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLDivElement | null>(null);
@@ -96,11 +105,26 @@ const SelectTree = (props: ISelectTreeProps) => {
   const [selectedCounts, setSelectedCounts] = useState(
     new Map<IValue, { total: number; selected: number }>()
   );
-  const [checkedItems, setCheckedItems] = useState<Record<IValue, boolean>>({});
-  const flatList = useMemo(
-    () => flattenTree(addIsFirstFlag(options)),
-    [options]
+  const [checkedItems2, setCheckedItems2] = useState(
+    new Map<IValue, { groupIds: IValue; childIds: IValue }>()
   );
+  const [checkedItems, setCheckedItems] = useState<Record<IValue, boolean>>({});
+  const flatList = useMemo(() => {
+    const result: IOption[] = [];
+    options.forEach((item) => {
+      if (item.label.includes(searchText)) {
+        result.push(item);
+      } else {
+        const matchedChildren =
+          item.children?.filter((child) => child.label.includes(searchText)) ||
+          [];
+        if (matchedChildren.length > 0) {
+          result.push({ ...item, children: matchedChildren });
+        }
+      }
+    });
+    return flattenTree(addIsFirstFlag(result));
+  }, [options, searchText]);
   const parentMap = useMemo(() => buildParentMap(options), [options]);
 
   const handleOpen = (event: MouseEvent<HTMLDivElement>) => {
@@ -121,114 +145,6 @@ const SelectTree = (props: ISelectTreeProps) => {
   const indeterminate = useMemo(() => {
     return !allChecked && Object.keys(checkedItems).length > 0;
   }, [allChecked, checkedItems]);
-
-  const handleSelectAll = () => {
-    if (allChecked) {
-      setCheckedItems({});
-      setSelectedCounts(new Map());
-    } else {
-      const newChecked: Record<IValue, boolean> = {};
-      const newCounts = new Map<IValue, { total: number; selected: number }>();
-      flatList.forEach((node) => {
-        newChecked[node.value] = true;
-      });
-      flatList.forEach((node) => {
-        if (node.children) {
-          const total = node.children.length;
-          const selected = node.children.filter(
-            (child) => newChecked[child.value]
-          ).length;
-
-          if (selected) {
-            newCounts.set(node.value, { total, selected });
-          } else {
-            newCounts.delete(node.value);
-          }
-        }
-      });
-      setCheckedItems(newChecked);
-      setSelectedCounts(newCounts);
-    }
-  };
-
-  const updateCheckedItems = (
-    id: IValue,
-    checked: boolean,
-    newChecked: Record<IValue, boolean>
-  ) => {
-    const node = flatList.find((n) => n.value === id);
-    if (node?.children) {
-      node.children.forEach((child) => {
-        if (checked) {
-          newChecked[child.value] = checked;
-        } else {
-          delete newChecked[child.value];
-        }
-      });
-    }
-
-    getParentIds(id, parentMap).forEach((parentId) => {
-      const parentNode = flatList.find((n) => n.value === parentId);
-      if (parentNode?.children) {
-        const isItemChildrenChecked = parentNode.children.some(
-          (child) => newChecked[child.value]
-        );
-        if (isItemChildrenChecked) {
-          newChecked[parentId] = isItemChildrenChecked;
-        } else {
-          delete newChecked[parentId];
-        }
-      }
-    });
-
-    if (!checked) {
-      delete newChecked[id];
-    }
-  };
-
-  const handleRemove = (id: IValue) => {
-    setCheckedItems((prev) => {
-      const newChecked = { ...prev };
-      delete newChecked[id];
-      updateCheckedItems(id, false, newChecked);
-      updateSelectedCounts(id, newChecked);
-      return newChecked;
-    });
-  };
-
-  const toggleCheck = (id: IValue, checked: boolean) => {
-    setCheckedItems((prev) => {
-      const newChecked = { ...prev, [id]: checked };
-      updateCheckedItems(id, checked, newChecked);
-      updateSelectedCounts(id, newChecked);
-      return newChecked;
-    });
-  };
-
-  const updateSelectedCounts = (
-    nodeId: IValue,
-    newChecked: Record<IValue, boolean>
-  ) => {
-    console.log({ newChecked: newChecked, nodeId: nodeId });
-    setSelectedCounts((prev) => {
-      const newCounts = new Map(prev);
-      [nodeId, ...getParentIds(nodeId, parentMap)].forEach((id) => {
-        const node = flatList.find((n) => n.value === id);
-        if (node?.children) {
-          const total = node.children.length;
-          const selected = node.children.filter(
-            (child) => newChecked[child.value]
-          ).length;
-          if (selected) {
-            newCounts.set(id, { total, selected });
-          } else {
-            newCounts.delete(id);
-          }
-        }
-      });
-      return newCounts;
-    });
-  };
 
   const tagLabels = useMemo(() => {
     return Array.from(selectedCounts.entries())
@@ -278,56 +194,53 @@ const SelectTree = (props: ISelectTreeProps) => {
   }, [updateHiddenTags]);
 
   useEffect(() => {
-    if (!value) return;
-    const newChecked: Record<IValue, boolean> = {};
-    const newCounts = new Map();
-    const updateNodeCount = (value: IValue) => {
-      const node = flatList.find((n) => n.value === value);
-      if (node?.children) {
-        const total = node.children.length;
-        const selected = node.children.filter(
-          (child) => newChecked[child.value]
-        ).length;
-        if (selected) {
-          newCounts.set(value, { total, selected });
+    console.log({ checkedItems2 });
+  }, [checkedItems2]);
+
+  const handleToggleCheck = (item: FlatNode) => {
+    const { parentId = "", value, children = [] } = item;
+    const key = `${parentId}-${value}`;
+    setCheckedItems2((prev) => {
+      const newCheckedItems = new Map(prev);
+      if (parentId) {
+        if (newCheckedItems.has(key)) {
+          newCheckedItems.delete(key);
         } else {
-          newCounts.delete(value);
+          newCheckedItems.set(key, {
+            groupIds: parentId,
+            childIds: value,
+          });
+        }
+      } else {
+        if (newCheckedItems.has(key)) {
+          newCheckedItems.delete(key);
+        } else {
+          children.forEach((child) => {
+            const key = `${child.parentId}-${child.value}`;
+            newCheckedItems.set(key, {
+              groupIds: child.parentId!,
+              childIds: child.value,
+            });
+          });
         }
       }
-    };
-    value.forEach((value) => {
-      newChecked[value] = true;
-      const node = flatList.find((n) => n.value === value);
-      if (node?.children) {
-        node.children.forEach((child) => {
-          newChecked[child.value] = true;
-        });
-      }
-
-      getParentIds(value, parentMap).forEach((parentId) => {
-        const parentNode = flatList.find((n) => n.value === parentId);
-        if (parentNode?.children) {
-          const allChildrenChecked = parentNode.children.every(
-            (child) => newChecked[child.value]
-          );
-          if (allChildrenChecked) {
-            newChecked[parentId] = allChildrenChecked;
-          } else {
-            delete newChecked[parentId];
-          }
-        }
-      });
-      updateNodeCount(value);
-      getParentIds(value, parentMap).forEach(updateNodeCount);
+      //   if (newCheckedItems.has(key)) {
+      //     newCheckedItems.delete(key);
+      //     if (!parentId && children) {
+      //       children.forEach(({ parentId, value }) => {
+      //         const key = `${parentId}-${value}`;
+      //         newCheckedItems.delete(key);
+      //       });
+      //     }
+      //   } else {
+      //     newCheckedItems.set(key, {
+      //       groupIds: parentId || 0,
+      //       childIds: value,
+      //     });
+      //   }
+      return newCheckedItems;
     });
-
-    setCheckedItems(newChecked);
-    setSelectedCounts(newCounts);
-  }, [value, flatList, parentMap]);
-
-  useEffect(() => {
-    console.log({ checkedItems, selectedCounts });
-  }, [checkedItems, selectedCounts]);
+  };
 
   const Row = ({
     index,
@@ -337,25 +250,27 @@ const SelectTree = (props: ISelectTreeProps) => {
     style: React.CSSProperties;
   }) => {
     const item = flatList[index];
-    const selectedCount = selectedCounts.get(item.value);
+    const key = `${item.parentId}-${item.value}`;
+    const selectedCount = selectedCounts.get(key);
     const indeterminate =
       selectedCount &&
       selectedCount.selected > 0 &&
       selectedCount.selected !== selectedCount.total &&
       !!item.children?.length;
 
+    const selected = checkedItems2.has(key);
     return (
       <Box
         style={style}
         sx={{
-          paddingLeft: `${item.depth * 20}px`,
+          paddingLeft: `${item.depth! * 20}px`,
           ...(item.isFirst && { borderTop: "1px solid #F2F2F2" }),
         }}
       >
         <ListItemButton
-          selected={!!checkedItems[item.value]}
+          selected={selected}
           onClick={() => {
-            toggleCheck(item.value, !checkedItems[item.value]);
+            handleToggleCheck(item);
           }}
           style={{ minWidth: 0, paddingBlock: 0 }}
           sx={{
@@ -365,11 +280,12 @@ const SelectTree = (props: ISelectTreeProps) => {
           }}
         >
           <Checkbox
-            checked={!!checkedItems[item.value]}
+            checked={selected}
             readOnly
             indeterminate={indeterminate}
             indeterminateIcon={<IndeterminateCheckBoxOutlinedIcon />}
             name={`row-checkbox-${item.value}`}
+            size="small"
           />
           <Typography
             noWrap
@@ -413,7 +329,7 @@ const SelectTree = (props: ISelectTreeProps) => {
               key={id}
               label={label}
               deleteIcon={<CloseOutlinedIcon />}
-              onDelete={() => handleRemove(id)}
+              // onDelete={() => handleRemove(id)}
               sx={{
                 borderRadius: 1.5,
                 "& .MuiChip-deleteIcon": {
@@ -466,7 +382,7 @@ const SelectTree = (props: ISelectTreeProps) => {
           <Box sx={{ borderBottom: "1px solid #F2F2F2" }}>
             <ListItemButton
               selected={allChecked}
-              onClick={handleSelectAll}
+              // onClick={handleSelectAll}
               style={{ minWidth: 0, paddingBlock: 0 }}
               sx={{
                 "&.Mui-selected": {
@@ -479,6 +395,7 @@ const SelectTree = (props: ISelectTreeProps) => {
                 readOnly
                 indeterminate={indeterminate}
                 indeterminateIcon={<IndeterminateCheckBoxOutlinedIcon />}
+                size="small"
               />
               <Typography
                 noWrap
@@ -505,4 +422,4 @@ const SelectTree = (props: ISelectTreeProps) => {
   );
 };
 
-export default SelectTree;
+export default SelectTree2;

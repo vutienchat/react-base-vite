@@ -10,6 +10,8 @@ import { FormProvider, useForm } from "react-hook-form";
 import CustomAutocomplete from "./components/CustomAutocomplete";
 import DateRangePicker from "./components/DateRangePicker";
 import SelectTree from "./components/SelectTree";
+import SelectTree2 from "./components/SelectTree2";
+import SelectTree3 from "./components/SelectTree3";
 
 const theme = createTheme({
   palette: {
@@ -18,6 +20,39 @@ const theme = createTheme({
     },
   },
 });
+
+interface TreeNode {
+  value: number | string;
+  label: string;
+  children?: TreeNode[];
+}
+
+function generateTreeData(count: number): TreeNode[] {
+  let value = 1;
+
+  function createNode(level: number): TreeNode {
+    value++;
+    const node: TreeNode = {
+      value: `VTC-${value}`,
+      label:
+        level === 0
+          ? `Nhóm kênh bán hàng trực tiếp ${value}`
+          : `${value}/ Kênh đại lý XNK`,
+    };
+
+    if (level < 1 && value < count) {
+      const childrenCount = Math.floor(Math.random() * 3) + 1;
+      node.children = Array.from({ length: childrenCount }, () =>
+        createNode(level + 1)
+      );
+    }
+
+    return node;
+  }
+
+  return Array.from({ length: Math.min(10, count) }, () => createNode(0));
+}
+const treeData: TreeNode[] = generateTreeData(100);
 
 function App() {
   const methods = useForm();
@@ -35,7 +70,12 @@ function App() {
       >
         <FormProvider {...methods}>
           {/* <TagInput value={[20, 13, 1]} /> */}
-          <SelectTree />
+          <SelectTree3
+            options={treeData}
+            onChange={(status, value) => {
+              console.log({ status, value });
+            }}
+          />
           <DateRangePicker />
           <CustomAutocomplete
             variant="standard"
