@@ -33,7 +33,8 @@ function generateTreeData(count: number): TreeNode[] {
   function createNode(level: number): TreeNode {
     value++;
     const node: TreeNode = {
-      value: `VTC-${value}`,
+      value,
+      // value: `VTC-${value}`,
       label:
         level === 0
           ? `Nhóm kênh bán hàng trực tiếp ${value}`
@@ -41,7 +42,7 @@ function generateTreeData(count: number): TreeNode[] {
     };
 
     if (level < 1 && value < count) {
-      const childrenCount = Math.floor(Math.random() * 3) + 1;
+      const childrenCount = Math.floor(Math.random() * 3);
       node.childrens = Array.from({ length: childrenCount }, () =>
         createNode(level + 1)
       );

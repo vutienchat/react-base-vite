@@ -83,8 +83,8 @@ const SelectTree2 = (props: ISelectTreeProps) => {
   const [checkedItems, setCheckedItems] = useState(
     new Map<IValue, { total: number; selected: number; childIds: IValue[] }>()
   );
-  const [checkedItems2, setCheckedItems2] = useState<Record<IValue, IValue[]>>(
-    {}
+  const [checkedItems2, setCheckedItems2] = useState(
+    new Map<IValue, IValue[]>()
   );
   const flatList = useMemo(() => {
     const result: IOption[] = [];
@@ -166,16 +166,25 @@ const SelectTree2 = (props: ISelectTreeProps) => {
     const { value, parentId, childrens } = itemChecked;
 
     setCheckedItems2((prev) => {
+      const updated = new Map(prev);
+
       if (parentId) {
-        const group = prev[parentId] || [];
-        const updated = checked
+        const group = updated.get(parentId) || [];
+        const newGroup = checked
           ? group.filter((id) => id !== value)
           : [...group, value];
-        return { ...prev, [parentId]: updated };
+        newGroup.length
+          ? updated.set(parentId, newGroup)
+          : updated.delete(parentId);
+      } else {
+        checked
+          ? updated.delete(value)
+          : updated.set(value, childrens?.map((item) => item.value) || []);
+        // ? []
+        // : childrens?.map((item) => item.value) || [];
       }
 
-      const updated = checked ? [] : childrens?.map((item) => item.value) || [];
-      return { ...prev, [value]: updated };
+      return updated;
     });
   };
 
@@ -188,27 +197,22 @@ const SelectTree2 = (props: ISelectTreeProps) => {
   }) => {
     const item = flatList[index];
 
-    const selectValue = checkedItems2[item.parentId || item.value] || [];
-    const selected = selectValue.includes(item.value);
+    const isParent = !item.parentId;
 
-    // Nếu là node cha
-    const isParent = !item.parentId && item.childrens?.length;
-    const childIds = item.childrens?.map((child) => child.value) || [];
-    const checkedChildIds = checkedItems2[item.value] || [];
+    let isChecked = false;
+    let isIndeterminate = false;
 
-    const isFullySelected =
-      isParent &&
-      childIds.length > 0 &&
-      childIds.every((id) => checkedChildIds.includes(id));
+    const checkedList = checkedItems2.get(item.parentId || item.value) || [];
+    if (isParent) {
+      const childIds = item.childrens?.map((child) => child.value) || [];
+      isChecked = childIds.length
+        ? childIds.every((id) => checkedList.includes(id))
+        : checkedItems2.has(item.value);
+      isIndeterminate = checkedList.length > 0 && !isChecked;
+    } else {
+      isChecked = checkedList.includes(item.value);
+    }
 
-    const isIndeterminate =
-      isParent &&
-      childIds.length > 0 &&
-      checkedChildIds.length > 0 &&
-      !isFullySelected;
-
-    const isChecked = isParent ? !!isFullySelected : !!selected;
-    // console.log({ selectValue, selected });
     return (
       <Box
         style={style}
