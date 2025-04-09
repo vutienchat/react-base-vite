@@ -11,7 +11,7 @@ import CustomAutocomplete from "./components/CustomAutocomplete";
 import DateRangePicker from "./components/DateRangePicker";
 import SelectTree from "./components/SelectTree";
 import SelectTree2 from "./components/SelectTree2";
-import SelectTree3 from "./components/SelectTree3";
+import SelectTree0904 from "./components/SelectTree0904";
 
 const theme = createTheme({
   palette: {
@@ -24,7 +24,7 @@ const theme = createTheme({
 interface TreeNode {
   value: number | string;
   label: string;
-  children?: TreeNode[];
+  childrens?: TreeNode[];
 }
 
 function generateTreeData(count: number): TreeNode[] {
@@ -42,7 +42,7 @@ function generateTreeData(count: number): TreeNode[] {
 
     if (level < 1 && value < count) {
       const childrenCount = Math.floor(Math.random() * 3) + 1;
-      node.children = Array.from({ length: childrenCount }, () =>
+      node.childrens = Array.from({ length: childrenCount }, () =>
         createNode(level + 1)
       );
     }
@@ -70,7 +70,7 @@ function App() {
       >
         <FormProvider {...methods}>
           {/* <TagInput value={[20, 13, 1]} /> */}
-          <SelectTree3
+          <SelectTree0904
             options={treeData}
             onChange={(status, value) => {
               console.log({ status, value });
