@@ -442,7 +442,7 @@ const SelectTree = (props: ISelectTreeProps) => {
         anchorEl={anchorEl}
         open={!!anchorEl}
         handleClose={handleClose}
-        width={width}
+        root={containerRef}
       >
         <Paper>
           <Box sx={{ px: 1, pt: 1, pb: "10px" }}>

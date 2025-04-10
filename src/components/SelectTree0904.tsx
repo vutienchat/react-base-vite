@@ -20,7 +20,6 @@ import {
 } from "@mui/material";
 import { ArrowDropDown, Search } from "@mui/icons-material";
 import { FixedSizeList } from "react-window";
-import useResizeObserver from "./useResizeObserver";
 import Dropdown from "./Dropdown";
 import IndeterminateCheckBoxOutlinedIcon from "@mui/icons-material/IndeterminateCheckBoxOutlined";
 import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
@@ -34,16 +33,20 @@ interface IOption {
   //   [x: string]: any;
 }
 
+interface FlatChild extends IOption {
+  parentId: IValue | null;
+}
+interface FlatNode extends Omit<IOption, "childrens"> {
+  depth: number;
+  parentId: IValue | null;
+  isFirst?: boolean;
+  childrens?: FlatChild[];
+}
+
 interface ISelectTreeProps {
   options: IOption[];
   value?: number[];
   onChange?: (status: "DELETE" | "ADD", value: FlatNode) => void;
-}
-
-interface FlatNode extends IOption {
-  depth: number;
-  parentId: IValue | null;
-  isFirst?: boolean;
 }
 
 const flattenTree = (
@@ -71,21 +74,19 @@ const flattenTree = (
 const addIsFirstFlag = (data: IOption[]) =>
   data.map((item) => ({ ...item, isFirst: true }));
 
+const HEIGHT_iTEM = 38;
+
 const SelectTree2 = (props: ISelectTreeProps) => {
   const { value, onChange, options = [] } = props;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLDivElement | null>(null);
-  const { width } = useResizeObserver(containerRef);
   const [hiddenCount, setHiddenCount] = useState<number>(0);
   const [searchText, setSearchText] = useState<string>("");
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [checkedItems, setCheckedItems] = useState(new Map<IValue, IValue[]>());
 
-  const [checkedItems, setCheckedItems] = useState(
-    new Map<IValue, { total: number; selected: number; childIds: IValue[] }>()
-  );
-  const [checkedItems2, setCheckedItems2] = useState(
-    new Map<IValue, IValue[]>()
-  );
+  const flatListCurrent = useMemo(() => flattenTree(options), [options]);
+
   const flatList = useMemo(() => {
     const result: IOption[] = [];
     options.forEach((item) => {
@@ -103,32 +104,132 @@ const SelectTree2 = (props: ISelectTreeProps) => {
     return flattenTree(addIsFirstFlag(result));
   }, [options, searchText]);
 
+  const allChecked = useMemo(() => {
+    return flatList.every((item) =>
+      !item.parentId
+        ? checkedItems.has(item.value)
+        : checkedItems.get(item.parentId)?.includes(item.value) ?? false
+    );
+  }, [checkedItems, flatList]);
+
+  const indeterminate = useMemo(() => {
+    return flatList.some((item) =>
+      !item.parentId
+        ? checkedItems.has(item.value) && !item.childrens?.length
+        : checkedItems.get(item.parentId)?.includes(item.value) ?? false
+    );
+  }, [checkedItems, flatList]);
+
   const handleOpen = (event: MouseEvent<HTMLDivElement>) => {
     setAnchorEl(event.currentTarget);
   };
 
   const handleClose = () => {
     setAnchorEl(null);
+    setSearchText("");
   };
 
-  const handleRemove = (id: IValue, children: FlatNode[]) => {};
+  const handleRemove = (id: IValue, children: FlatChild[]) => {
+    setCheckedItems((prev) => {
+      const updated = new Map(prev);
+      updated.delete(id);
+      return updated;
+    });
+  };
+
+  const handleToggleCheck = (itemChecked: FlatNode, checked: boolean) => {
+    const { value, parentId, childrens = [] } = itemChecked;
+    setCheckedItems((prev) => {
+      const updated = new Map(prev);
+
+      if (parentId) {
+        const siblings = updated.get(parentId) || [];
+        const newSiblings = checked
+          ? siblings.filter((id) => id !== value)
+          : [...siblings, value];
+
+        newSiblings.length
+          ? updated.set(parentId, newSiblings)
+          : updated.delete(parentId);
+      } else {
+        const existing = updated.get(value) || [];
+        const childrenIds = childrens.map((child) => child.value);
+
+        if (checked) {
+          const filtered = existing.filter((id) => !childrenIds.includes(id));
+          filtered.length
+            ? updated.set(value, filtered)
+            : updated.delete(value);
+        } else {
+          updated.set(value, childrenIds);
+        }
+      }
+
+      return updated;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (allChecked) {
+      setCheckedItems((prev) => {
+        const updated = new Map(prev);
+        flatList.forEach(({ value, childrens }) => {
+          const dataItem = updated.get(value);
+          if (dataItem) {
+            const childIds = dataItem.filter(
+              (id) => !childrens?.some((child) => child.value === id)
+            );
+            childIds.length
+              ? updated.set(value, childIds)
+              : updated.delete(value);
+          }
+        });
+        return updated;
+      });
+    } else {
+      setCheckedItems((prev) => {
+        const updated = new Map(prev);
+        flatList.forEach(({ parentId, value }) => {
+          if (!parentId && !updated.has(value)) {
+            updated.set(value, []);
+          } else {
+            const dataItem = updated.get(parentId!) || [];
+            if (!dataItem) {
+              updated.set(parentId!, [value]);
+            } else {
+              const isExits = dataItem.includes(value);
+              !isExits && updated.set(parentId!, [...dataItem, value]);
+            }
+          }
+        });
+        return updated;
+      });
+    }
+  };
 
   const tagLabels = useMemo(() => {
-    return Array.from(checkedItems.entries())
-      .filter(([_, { selected }]) => selected > 0)
-      .map(([parentId, { selected, total }]) => {
-        const parent = flatList.find((n) => n.value === parentId);
+    const result: {
+      id: IValue;
+      label: string;
+      children: FlatChild[];
+    }[] = [];
 
-        return parent
-          ? {
-              id: parent.value,
-              label: `${parent.label} (${selected}/${total})`,
-              children: parent.childrens,
-            }
-          : null;
-      })
-      .filter(Boolean) as { id: IValue; label: string; children: FlatNode[] }[];
-  }, [flatList, checkedItems]);
+    checkedItems.forEach((ids, parentId) => {
+      const parent = flatListCurrent.find((n) => n.value === parentId);
+      if (parent) {
+        const totalChildren = parent.childrens?.length ?? 0;
+        result.push({
+          id: parent.value,
+          label: `${parent.label}${
+            totalChildren ? ` (${ids.length}/${totalChildren})` : ""
+          }`,
+          children: parent.childrens || [],
+        });
+      }
+    });
+
+    return result;
+  }, [flatListCurrent, checkedItems]);
 
   const updateHiddenTags = useCallback(() => {
     if (!inputRef.current) return;
@@ -159,34 +260,8 @@ const SelectTree2 = (props: ISelectTreeProps) => {
   }, [updateHiddenTags]);
 
   useEffect(() => {
-    console.log({ checkedItems2 });
-  }, [checkedItems2]);
-
-  const handleToggleCheck = (itemChecked: FlatNode, checked: boolean) => {
-    const { value, parentId, childrens } = itemChecked;
-
-    setCheckedItems2((prev) => {
-      const updated = new Map(prev);
-
-      if (parentId) {
-        const group = updated.get(parentId) || [];
-        const newGroup = checked
-          ? group.filter((id) => id !== value)
-          : [...group, value];
-        newGroup.length
-          ? updated.set(parentId, newGroup)
-          : updated.delete(parentId);
-      } else {
-        checked
-          ? updated.delete(value)
-          : updated.set(value, childrens?.map((item) => item.value) || []);
-        // ? []
-        // : childrens?.map((item) => item.value) || [];
-      }
-
-      return updated;
-    });
-  };
+    console.log({ checkedItems });
+  }, [checkedItems]);
 
   const Row = ({
     index,
@@ -196,19 +271,21 @@ const SelectTree2 = (props: ISelectTreeProps) => {
     style: React.CSSProperties;
   }) => {
     const item = flatList[index];
-
     const isParent = !item.parentId;
 
     let isChecked = false;
     let isIndeterminate = false;
 
-    const checkedList = checkedItems2.get(item.parentId || item.value) || [];
+    const checkedList = checkedItems.get(item.parentId || item.value) || [];
     if (isParent) {
       const childIds = item.childrens?.map((child) => child.value) || [];
       isChecked = childIds.length
         ? childIds.every((id) => checkedList.includes(id))
-        : checkedItems2.has(item.value);
-      isIndeterminate = checkedList.length > 0 && !isChecked;
+        : checkedItems.has(item.value);
+      isIndeterminate =
+        checkedList.length > 0 &&
+        childIds.some((id) => checkedList.includes(id)) &&
+        !isChecked;
     } else {
       isChecked = checkedList.includes(item.value);
     }
@@ -312,7 +389,7 @@ const SelectTree2 = (props: ISelectTreeProps) => {
         anchorEl={anchorEl}
         open={!!anchorEl}
         handleClose={handleClose}
-        width={width}
+        root={containerRef}
       >
         <Paper>
           <Box sx={{ px: 1, pt: 1, pb: "10px" }}>
@@ -333,40 +410,42 @@ const SelectTree2 = (props: ISelectTreeProps) => {
               }}
             />
           </Box>
-          <Box sx={{ borderBottom: "1px solid #F2F2F2" }}>
-            <ListItemButton
-              // selected={allChecked}
-              // onClick={handleSelectAll}
-              style={{ minWidth: 0, paddingBlock: 0 }}
-              sx={{
-                "&.Mui-selected": {
-                  backgroundColor: "#F2F2F2",
-                },
-              }}
-            >
-              <Checkbox
-                // checked={allChecked}
-                readOnly
-                // indeterminate={!!checkedItems.size && !allChecked}
-                indeterminateIcon={<IndeterminateCheckBoxOutlinedIcon />}
-                size="small"
-              />
-              <Typography
-                noWrap
+          {flatList.length > 0 && (
+            <Box sx={{ borderBottom: "1px solid #F2F2F2" }}>
+              <ListItemButton
+                selected={allChecked}
+                onClick={handleSelectAll}
+                style={{ minWidth: 0, paddingBlock: 0 }}
                 sx={{
-                  flexGrow: 1,
+                  "&.Mui-selected": {
+                    backgroundColor: "#F2F2F2",
+                  },
                 }}
-                color={"#292929"}
               >
-                Chọn tất cả
-              </Typography>
-            </ListItemButton>
-          </Box>
+                <Checkbox
+                  checked={allChecked}
+                  readOnly
+                  indeterminate={indeterminate && !allChecked}
+                  indeterminateIcon={<IndeterminateCheckBoxOutlinedIcon />}
+                  size="small"
+                />
+                <Typography
+                  noWrap
+                  sx={{
+                    flexGrow: 1,
+                  }}
+                  color={"#292929"}
+                >
+                  Chọn tất cả
+                </Typography>
+              </ListItemButton>
+            </Box>
+          )}
           <FixedSizeList
             width={"100%"}
-            height={300}
+            height={Math.min(HEIGHT_iTEM * 7, HEIGHT_iTEM * flatList.length)}
             itemCount={flatList.length}
-            itemSize={42}
+            itemSize={HEIGHT_iTEM}
           >
             {Row}
           </FixedSizeList>

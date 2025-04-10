@@ -1,4 +1,4 @@
-import React from "react";
+import React, { RefObject } from "react";
 import {
   Popper,
   Grow,
@@ -6,23 +6,26 @@ import {
   PopperProps,
   Box,
 } from "@mui/material";
+import useResizeObserver from "./useResizeObserver";
 
 interface DropdownProps extends Partial<PopperProps> {
   anchorEl: PopperProps["anchorEl"];
   open: boolean;
   handleClose: () => void;
-  width?: string | number;
   children: React.ReactNode;
+  root?: RefObject<HTMLDivElement>;
 }
 
 const Dropdown: React.FC<DropdownProps> = ({
   anchorEl,
   open,
   handleClose,
-  width = "auto",
   children,
+  root,
   ...popperProps
 }) => {
+  const { width } = useResizeObserver(root);
+
   return (
     <Popper
       open={open}
@@ -30,17 +33,9 @@ const Dropdown: React.FC<DropdownProps> = ({
       transition
       placement="bottom-start"
       style={{
-        width,
+        width: width || "auto",
         minWidth: 200,
       }}
-      modifiers={[
-        {
-          name: "offset",
-          options: {
-            offset: [0, 10],
-          },
-        },
-      ]}
       {...popperProps}
     >
       {({ TransitionProps, placement }) => (

@@ -1,5 +1,5 @@
 import type { RefObject } from "react";
-import { useLayoutEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 interface useResizeObserverRect {
   bottom: number;
@@ -12,7 +12,7 @@ interface useResizeObserverRect {
   y: number;
 }
 
-const useResizeObserver = (ref: RefObject<HTMLDivElement>) => {
+const useResizeObserver = (ref?: RefObject<HTMLDivElement>) => {
   const [rect, setRect] = useState<useResizeObserverRect>({
     bottom: 0,
     height: 0,
@@ -24,8 +24,8 @@ const useResizeObserver = (ref: RefObject<HTMLDivElement>) => {
     y: 0,
   });
 
-  useLayoutEffect(() => {
-    if (!ref.current) return;
+  useEffect(() => {
+    if (!ref?.current) return;
     const observer = new ResizeObserver((entries) => {
       if (entries[0]) {
         const { x, y, width, height, top, left, bottom, right } =

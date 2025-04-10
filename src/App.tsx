@@ -53,7 +53,7 @@ function generateTreeData(count: number): TreeNode[] {
 
   return Array.from({ length: Math.min(10, count) }, () => createNode(0));
 }
-const treeData: TreeNode[] = generateTreeData(100);
+const treeData: TreeNode[] = generateTreeData(30);
 
 function App() {
   const methods = useForm();
